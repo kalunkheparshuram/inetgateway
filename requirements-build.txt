@@ -1,0 +1,2 @@
+# Build-time only (not needed to run InetGateway). Pinned; bump deliberately and re-test.
+pyinstaller==6.22.3

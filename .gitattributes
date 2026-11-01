@@ -1,2 +1,13 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Normalize text files to LF in the repository and working tree.
+* text=auto eol=lf
+
+# Windows command scripts use CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Shell scripts use LF.
+*.sh text eol=lf
+
+# Binary assets must not be modified by Git.
+*.png binary
+*.ico binary

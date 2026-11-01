@@ -1,0 +1,2 @@
+# Development tools only. InetGateway itself needs nothing beyond the Python standard library.
+pyflakes==3.4.0

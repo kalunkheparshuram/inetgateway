@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=InetGateway
+GenericName=Network traffic viewer
+Comment=Offline packet viewer with a per-application dashboard
+Exec=inetgateway
+Icon=inetgateway
+Terminal=false
+Categories=System;Monitor;Security;
+Keywords=network;packet;traffic;wireshark;dns;monitor;
+StartupNotify=true

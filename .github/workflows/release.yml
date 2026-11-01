@@ -1,0 +1,114 @@
+name: Release
+
+# Push a tag like v0.1.0 to build and publish a GitHub release with the .exe, the .deb and SHA256SUMS.txt.
+# "Run workflow" (workflow_dispatch) builds and tests everything but publishes nothing.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Tag, source version and CHANGELOG must agree
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: python packaging/check_version.py "$GITHUB_REF_NAME"
+      - name: Version/CHANGELOG consistency (no tag)
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        run: python packaging/check_version.py
+      - name: Unit tests
+        run: python -m unittest tests.test_inetgateway -v
+
+  build-windows:
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Build InetGateway.exe (PyInstaller, pinned in requirements-build.txt)
+        shell: cmd
+        run: packaging\windows\build_exe.bat
+      - name: Smoke test (starts the GUI in demo mode and exits)
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath dist\InetGateway.exe -ArgumentList '--demo','--exit-after','3' -PassThru -Wait
+          if ($p.ExitCode -ne 0) { throw "InetGateway.exe exited with code $($p.ExitCode)" }
+      - name: Give the file its release name
+        shell: pwsh
+        run: |
+          $v = python packaging/print_version.py
+          Move-Item dist\InetGateway.exe "dist\InetGateway-$v-windows-x64.exe"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-exe
+          path: dist/InetGateway-*-windows-x64.exe
+          if-no-files-found: error
+
+  build-deb:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - name: Tools for checking the package
+        run: sudo apt-get update && sudo apt-get install -y lintian xvfb python3-tk
+      - name: Build the .deb
+        env:
+          MAINTAINER: ${{ vars.DEB_MAINTAINER }}
+          HOMEPAGE: ${{ github.server_url }}/${{ github.repository }}
+        run: packaging/debian/build_deb.sh
+      - name: Lint the package (errors fail the build; warnings are shown)
+        run: lintian --fail-on error --display-info dist/*.deb
+      - name: Install it, run it, remove it
+        run: |
+          sudo apt-get install -y ./dist/inetgateway_*_all.deb
+          inetgateway --version
+          xvfb-run -a inetgateway --demo --exit-after 3
+          sudo apt-get remove -y inetgateway
+      - uses: actions/upload-artifact@v7
+        with:
+          name: debian-package
+          path: dist/inetgateway_*_all.deb
+          if-no-files-found: error
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-windows, build-deb]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Checksums of exactly what will be published
+        working-directory: artifacts
+        run: |
+          ls -l
+          sha256sum -- *.exe *.deb > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 packaging/release_notes.py "$GITHUB_REF_NAME" > notes.md
+          PRE=""
+          case "$GITHUB_REF_NAME" in v0.*|*-*) PRE="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" artifacts/* \
+            --title "InetGateway ${GITHUB_REF_NAME#v}" \
+            --notes-file notes.md --verify-tag $PRE

@@ -1,0 +1,34 @@
+.TH INETGATEWAY 1 "November 2026" "InetGateway" "User Commands"
+.SH NAME
+inetgateway \- offline packet viewer with a per-application dashboard
+.SH SYNOPSIS
+.B inetgateway
+[\fB\-\-demo\fR] [\fB\-\-version\fR] [\fB\-\-help\fR]
+.SH DESCRIPTION
+.B InetGateway
+is a graphical, Wireshark-style traffic viewer. It captures what reaches this
+computer, decodes it, and groups it by program and service on a dashboard.
+It never decrypts traffic, never blocks or changes anything, and makes no
+network connections unless the optional VirusTotal lookups are enabled in the
+Threat Intel tab.
+.PP
+Live capture needs root or the CAP_NET_RAW capability, for example:
+.PP
+.RS
+sudo \-E inetgateway
+.RE
+.SH OPTIONS
+.TP
+.B \-\-demo
+Show clearly labelled synthetic traffic (for trying the interface; nothing is captured).
+.TP
+.B \-\-version
+Print the version and exit.
+.SH FILES
+.TP
+.I ~/.config/InetGateway/config.json
+Settings. The optional VirusTotal key and lookup cache are stored next to it.
+.SH SEE ALSO
+.I /usr/share/doc/inetgateway/
+.SH LICENSE
+GNU General Public License, version 3 or later.

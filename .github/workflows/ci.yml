@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m pyflakes inetgateway.py tests packaging
+      - run: python packaging/check_version.py
+
+  test-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install a virtual display and Tk
+        run: sudo apt-get update && sudo apt-get install -y xvfb python3-tk
+      - name: Unit and GUI tests (virtual display)
+        run: xvfb-run -a python -m unittest discover -s tests -v
+      - name: Linux capture tests (root, loopback only)
+        run: sudo "$(which python)" -m unittest tests.test_inetgateway.LinuxCaptureIntegrationTests -v
+
+  test-windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Unit tests
+        run: python -m unittest tests.test_inetgateway -v
+      - name: GUI smoke tests (experimental, may be unstable on hosted runners)
+        continue-on-error: true
+        run: python -m unittest tests.test_gui_smoke -v
+
+  build-deb:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build the .deb
+        run: packaging/debian/build_deb.sh
+      - name: Inspect
+        run: |
+          dpkg-deb --info dist/*.deb
+          dpkg-deb --contents dist/*.deb
