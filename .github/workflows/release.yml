@@ -68,7 +68,7 @@ jobs:
         env:
           MAINTAINER: ${{ vars.DEB_MAINTAINER }}
           HOMEPAGE: ${{ github.server_url }}/${{ github.repository }}
-        run: packaging/debian/build_deb.sh
+        run: bash packaging/debian/build_deb.sh
       - name: Lint the package (errors fail the build; warnings are shown)
         run: lintian --fail-on error --display-info dist/*.deb
       - name: Install it, run it, remove it
