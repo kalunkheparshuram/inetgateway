@@ -26,19 +26,31 @@ jobs:
       - run: python packaging/check_version.py
 
   test-linux:
-    runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.11", "3.12", "3.13"]
+        include:
+          # Python 3.9 is not available from setup-python on the
+          # Ubuntu 26.04 runner shown in the failed workflow.
+          - python-version: "3.9"
+            os: ubuntu-22.04
+          - python-version: "3.11"
+            os: ubuntu-latest
+          - python-version: "3.12"
+            os: ubuntu-latest
+          - python-version: "3.13"
+            os: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install a virtual display and Tk
-        run: sudo apt-get update && sudo apt-get install -y xvfb python3-tk
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb python3-tk
       - name: Unit and GUI tests (virtual display)
         run: xvfb-run -a python -m unittest discover -s tests -v
       - name: Linux capture tests (root, loopback only)
@@ -64,7 +76,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Build the .deb
-        run: packaging/debian/build_deb.sh
+        run: bash packaging/debian/build_deb.sh
       - name: Inspect
         run: |
           dpkg-deb --info dist/*.deb
